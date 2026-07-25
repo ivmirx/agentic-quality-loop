@@ -48,9 +48,9 @@ record the limitation rather than inventing a hard parser.
 7. When a fresh reviewer is available, let the writer fix accepted blocking
    findings, rerun the gate, and ask the same reviewer for one verification
    pass.
-8. Stop after two review/fix passes unless a correctness, security, data-loss,
-   authority, or similarly severe defect remains. Record non-blocking ideas
-   without expanding the task.
+8. After the initial review and its one verification pass, stop unless a
+   correctness, security, data-loss, authority, or similarly severe defect
+   remains. Record non-blocking ideas without expanding the task.
 
 ## Select the gate
 

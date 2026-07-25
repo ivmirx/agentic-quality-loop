@@ -25,20 +25,25 @@ Martin's related tools like [`crap4java`](https://github.com/unclebob/crap4java)
 
 1. **One command checks the work.** Each project gets a single script that runs
    its tests and automatic checks, then clearly passes or fails. This is the
-   **quality gate**: the agent must pass it before saying the task is done.
+   **quality gate**: the agent must pass it before claiming a clean result. A
+   genuine pre-existing product, test, or data failure stays visible and is
+   reported in the handoff instead of being hidden. Quality-system defects and
+   task-caused failures must be fixed.
 
 2. **The checks fit the project.** A small project may only need tests and a
    build. Others may add test coverage percentage, cyclomatic complexity (how
    many different paths a function can take), mutation testing (whether tests
-   catch deliberately inserted bugs), database checks, or rules about which 
-   parts of the app may talk to each other.
+   catch deliberately inserted bugs), database checks, or rules about which
+   parts of the app may talk to each other. Language-aware checks use maintained
+   compiler or ecosystem tools, not parsers invented for this system.
 
 3. **A second agent checks what scripts cannot.** After the deterministic checks,
    a different agent reviews it for bad design, weak tests, and behavior mistakes.
    It can report problems, but it cannot edit the code or excuse a failed check.
 
-4. **The first agent gets one repair pass.** It fixes valid findings, runs all
-   checks again, then asks the reviewer to verify the fixes one more time.
+4. **The first agent gets one repair pass.** It fixes accepted blocking
+   findings, runs all checks again, then asks the same reviewer to verify the
+   fixes once. Non-blocking ideas are recorded without growing the task.
 
 5. **Every claim needs proof.** The agent cannot just say “tests passed.” It has
    to produce fresh results and report real failures. It must not weaken a
@@ -49,11 +54,16 @@ Martin's related tools like [`crap4java`](https://github.com/unclebob/crap4java)
 
 ```mermaid
 flowchart LR
-    A["Agent writes or fixes code"] --> B["Quality gate<br/>Tests and automatic checks"]
-    B -- "Fails" --> A
-    B -- "Passes" --> C["Fresh reviewer<br/>Design, behavior, and weak tests"]
-    C -- "Valid findings<br/>(one repair pass)" --> A
-    C -- "No blockers" --> D["Done"]
+    A["Agent writes code"] --> B["Quality gate"]
+    B -- "Task-caused or quality-system failure" --> A
+    B -- "Pass, or only genuine pre-existing product/test/data failures" --> C["Fresh reviewer"]
+    C -- "No blockers" --> G["Handoff"]
+    C -- "Accepted blockers" --> D["Agent's one repair pass"]
+    D --> E["Quality gate runs again"]
+    E -- "Task-caused or quality-system failure" --> D
+    E -- "Pass, or only genuine pre-existing product/test/data failures" --> F["Same reviewer verifies once"]
+    F -- "Verified; non-blocking ideas recorded" --> G
+    F -- "Severe issue remains" --> H["Escalate"]
 ```
 
 ## Repository layout
@@ -103,9 +113,13 @@ The target repository must expose exactly one supported entrypoint:
 `quality/gate`, `quality/gate.sh`, `quality/gate.mjs`, `quality/gate.py`, or
 `quality/gate.ps1`.
 
-Non-dry runs are serialized across repositories on the local machine. Output is
-capped at 8 MiB, and the private runner log store keeps the current completed
-run plus one previous completed run by default. Pass
+Non-dry runs through this wrapper are serialized for the current user across
+repositories. A conflicting wrapper run does not wait: it exits `BUSY`. Direct
+calls to `quality/gate*` bypass this outer lock and rely on the repository's own
+concurrency protection. They must not be used to evade `BUSY`.
+
+Output is capped at 8 MiB, and the private runner log store keeps the current
+completed run plus one previous completed run by default. Pass
 `--keep-previous-runs <count>` to choose a different bounded history when the
 repository gate supports the same option.
 
@@ -122,3 +136,7 @@ python3 tests/test_run_quality_gate.py
 
 The runner tests use temporary Git repositories and do not require changes to a
 real project.
+
+## License
+
+CC0, do whatever
