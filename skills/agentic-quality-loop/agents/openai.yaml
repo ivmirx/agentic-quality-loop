@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agentic Quality Loop"
+  short_description: "Bootstrap, run, and review quality gates"
+  default_prompt: "Use $agentic-quality-loop to bootstrap or run this repository's deterministic quality gate and independent review."
