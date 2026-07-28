@@ -30,11 +30,14 @@ record the limitation rather than inventing a hard parser.
 2. Read the nearest `AGENTS.md` when present, follow its referenced architecture,
    concurrency, build, and quality documents, then select only the sections
    relevant to the changed paths.
-3. Implement with one writer. Run focused checks while working.
-4. Run the repository gate through `scripts/run_quality_gate.py`, normally with
-   `auto`. Use `fast` for iteration and `full` before handoff when the local
-   policy requires it. Never replace a failed deterministic check with manual
-   inspection.
+3. Implement with one writer. Run the narrowest focused checks while working,
+   or `fast` when no narrower command exists. Do not run `auto` or `full` after
+   every small edit.
+4. When the implementation is stable, run the repository gate through the
+   resolved `scripts/run_quality_gate.py` executable, normally with `auto`.
+   Rerun it after correcting a failed gate and after accepted reviewer fixes.
+   Use `full` before handoff only when the local policy requires it. Never
+   replace a failed deterministic check with manual inspection.
 5. Resolve quality-system defects and task-caused regressions before review.
    Keep genuine pre-existing product, test, or data failures hard and report
    them; never weaken the gate to manufacture a pass. Read full logs only for
@@ -59,9 +62,17 @@ or `quality/gate.sh`, `.mjs`, `.py`, or `.ps1`. The bundled runner discovers
 that entrypoint and captures noisy output outside the repository:
 
 ```text
-python3 <skill-root>/scripts/run_quality_gate.py \
-  --repo <repository-root> --profile auto --base <base-sha>
+<absolute-skill-root>/scripts/run_quality_gate.py \
+  --repo <absolute-repository-root> --profile auto --base <base-sha>
 ```
+
+Resolve both absolute paths and invoke the executable directly. Do not prefix
+it with `python` or `python3`: sandbox approvals may be scoped to the runner
+executable, and an interpreter prefix can leave SDK, IPC, cache, or package
+restore operations sandboxed. When the host blocks facilities a repository
+gate genuinely needs, request narrow approval for the direct runner command
+and run outside the sandbox only to that extent. The runner cannot grant itself
+host permissions.
 
 Every non-dry-run invocation takes one per-user, machine-wide POSIX kernel lock
 before starting the repository gate. If another universal-runner gate is
@@ -86,6 +97,11 @@ Use the task's recorded base. If there is no recorded base, use `HEAD` only for
 an uncommitted task delta; do not guess across unrelated commits. See
 `references/gate-contract.md` for profiles and output requirements.
 
+For a materially expensive gate, `auto` selects the smallest sufficient union
+of checks rather than an unrelated coarse profile. The repository gate owns
+that routing and must explain why it selected expensive checks. Do not add
+cross-run result reuse to hide overbroad routing.
+
 ## Bootstrap a repository
 
 When the repository has no supported `quality/gate` entrypoint, or the user asks
@@ -109,6 +125,10 @@ Treat these as mechanical when the gate covers them:
 - dependency direction and cycles;
 - focused/full test execution and forbidden skipped/focused tests;
 - coverage, mutation, generated-artifact drift, and reproducibility probes.
+
+A mutation pilot must end with an explicit decision to retain it, run it only
+periodically, or remove it. Removal is valid when runtime, dependencies, or
+survivor signal do not justify continued maintenance.
 
 Leave these to the reviewer:
 

@@ -116,6 +116,10 @@ Text-only gates run through the universal runner already receive a bounded
 machine-wide lock. Keep direct output useful, but do not duplicate those
 facilities without a repository-specific reason.
 
+Do not cache prior pass/fail results across gate runs. Dependency or compiler
+caches may accelerate a freshly executed check when their toolchain supports
+correct invalidation, but stale evidence is not a current pass.
+
 Use proportionality as a design test. If the quality implementation approaches
 or exceeds the product code it checks, pause and justify each subsystem. A
 small honest gate with documented limitations is preferable to a comprehensive
@@ -149,7 +153,9 @@ ecosystem files in their conventional locations.
 The gate accepts `fast`, `auto`, and `full`, plus optional `native`, and accepts
 `--base <commit>`. Profiles may intentionally select the same checks when the
 whole gate is cheap. Document exactly what each profile proves and what it does
-not prove.
+not prove. When `native` exists, make it a documented SDK-dependent superset of
+`full`. If routine verification is already inherently platform-dependent, omit
+the extra profile and keep those checks in `full`.
 
 Wire the repository's existing agent instructions to the gate and its README
 without copying the policy into those instructions. If autonomous agents use
@@ -172,7 +178,9 @@ Start with fresh measurements from this repository:
   embedded in a report;
 - use method-level CRAP only when the toolchain reliably maps method complexity
   to fresh method coverage; otherwise keep complexity and coverage separate;
-- pilot mutation testing on a small, important pure rule before making it hard;
+- pilot mutation testing on a small, important pure rule before making it hard,
+  record runtime and useful survivors, then explicitly retain it, make it
+  periodic, or remove its dependencies and commands;
 - audit tests for observable behavior, invariants, state transitions, failure
   recovery, and boundary contracts.
 
@@ -184,9 +192,26 @@ another language or repository.
 
 When routing is worth its maintenance cost, `auto` considers committed changes
 since the base plus staged, unstaged, untracked, deleted, and both sides of
-renamed paths. Map path families to the union of required checks. Shared
-contracts must route every affected consumer. Unknown relevant paths widen to
-`full` rather than silently passing.
+renamed paths. Map path families to the smallest sufficient union of required
+checks, not merely to a coarse named profile. Shared contracts must route every
+affected consumer. Unknown relevant paths widen to `full`, or to `native` when
+they may affect its evidence, rather than silently passing. An explicit `full`
+run remains exhaustive for the repository's default local tier.
+
+Measure before routing. Tie an expensive check to the inputs or behavior it can
+actually invalidate: dependency reproducibility to dependency metadata, native
+builds to native consumers, and runtime smokes to the behavior groups they
+exercise. Prefer a few stable semantic groups over a per-file matrix, but do
+not let one broad native or UI boolean run unrelated smokes. Pure documentation
+does not earn product builds merely because it lives under `quality/`.
+
+Print the selected expensive checks and the changed path or rule that selected
+each one. Print per-check elapsed time when `auto` or `full` is materially
+slower than `fast`. Remove duplicate execution within one invocation before
+adding caches or more profiles.
+
+Every diff consumer—not only the router—must handle a path that was deleted or
+renamed without trying to read a missing working-tree file.
 
 When the whole gate is cheap, make `auto` run `full` and omit routing code and
 routing fixtures. Otherwise write routing fixtures using real temporary Git
@@ -214,6 +239,9 @@ Do not create an artifact subsystem solely to satisfy this section.
   only through an explicit first-run opt-in, then run offline where the
   ecosystem supports it;
 - propagate child failures and timeouts;
+- do not retry deterministic, policy, compiler, or toolchain failures; retry
+  only a known transient operation, bound the attempt count, and preserve the
+  first failure in diagnostics;
 - verify test-result counters, coverage package/assembly and source identity,
   and nonempty production data; if collectors emit multiple candidate reports,
   accept them only when the gate can prove they are equivalent (for example,
@@ -237,7 +265,9 @@ Do not create an artifact subsystem solely to satisfy this section.
   the repository lock;
 - treat a missing tool, SDK, credential, or other prerequisite as an explicit
   non-pass or unavailable result; never count an unexecuted hard check as pass;
-- print terse success lines and bounded failure diagnostics with full log paths.
+- print terse success lines and bounded failure diagnostics with full log paths;
+- when profiles have materially different costs, print per-check durations and
+  route reasons for expensive checks.
 
 ## 8. Attack the gate before trusting it
 
@@ -255,7 +285,8 @@ Examples include:
   APIs, comments, and strings; do not duplicate the upstream parser's
   conformance suite;
 - renamed/deleted sensitive paths, unknown paths, duplicate entrypoints, and
-  concurrent invocation;
+  concurrent invocation; exercise every changed-file scanner against a deleted
+  path, not only the route selector;
 - symlinked or foreign-owned artifact roots, caches, run directories, and
   retention candidates before any write or deletion;
 - generated outputs that are mutually deterministic but differ from the

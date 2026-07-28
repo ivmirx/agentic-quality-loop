@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Adversarial tests for the common quality-gate runner."""
+"""Adversarial tests for the common runner and its invocation contract."""
 
 from __future__ import annotations
 
@@ -18,13 +18,9 @@ import unittest
 from unittest import mock
 
 
-SCRIPT = (
-    Path(__file__).resolve().parents[1]
-    / "skills"
-    / "agentic-quality-loop"
-    / "scripts"
-    / "run_quality_gate.py"
-)
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+SKILL_ROOT = REPOSITORY_ROOT / "skills" / "agentic-quality-loop"
+SCRIPT = SKILL_ROOT / "scripts" / "run_quality_gate.py"
 SPEC = importlib.util.spec_from_file_location("run_quality_gate", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 RUNNER = importlib.util.module_from_spec(SPEC)
@@ -868,6 +864,24 @@ class RunnerTests(unittest.TestCase):
     )
     def test_sighup_kills_descendant_and_reports_129(self) -> None:
         self.assert_signal_kills_descendant(signal.SIGHUP, 129)
+
+
+class SkillDocumentationTests(unittest.TestCase):
+    def test_examples_invoke_the_runner_executable_directly(self) -> None:
+        expected = "<absolute-skill-root>/scripts/run_quality_gate.py \\\n"
+        interpreter_prefix = (
+            r"python(?:3)?\s+[^\n]*/scripts/run_quality_gate\.py"
+        )
+
+        for path in (REPOSITORY_ROOT / "README.md", SKILL_ROOT / "SKILL.md"):
+            with self.subTest(path=path):
+                content = path.read_text(encoding="utf-8")
+                self.assertIn(expected, content)
+                self.assertNotRegex(content, interpreter_prefix)
+
+    @unittest.skipUnless(os.name == "posix", "executable mode is POSIX-specific")
+    def test_documented_runner_is_executable(self) -> None:
+        self.assertTrue(os.access(SCRIPT, os.X_OK))
 
 
 if __name__ == "__main__":

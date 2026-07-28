@@ -105,13 +105,26 @@ Invoke the skill through the client, or run its universal gate wrapper
 directly:
 
 ```text
-python3 <skill-root>/scripts/run_quality_gate.py \
-  --repo <repository-root> --profile auto --base <base-sha>
+<absolute-skill-root>/scripts/run_quality_gate.py \
+  --repo <absolute-repository-root> --profile auto --base <base-sha>
 ```
+
+Resolve both paths and invoke the executable directly. Do not prefix it with
+`python` or `python3`: executable-scoped host approval may otherwise fail to
+cover the gate's SDK, IPC, cache, or package-restore work. On a sandboxed host,
+request only the narrow approval the direct runner and selected repository gate
+need.
 
 The target repository must expose exactly one supported entrypoint:
 `quality/gate`, `quality/gate.sh`, `quality/gate.mjs`, `quality/gate.py`, or
 `quality/gate.ps1`.
+
+Use focused checks or the repository's `fast` profile while editing. Run
+`auto` when the implementation is stable, after fixing a failed gate, and
+after accepted reviewer fixes. Use `full` when the repository policy or the
+change requires exhaustive local verification, not after every small edit.
+For a materially expensive gate, `auto` should select the smallest sufficient
+union of checks and report why it selected expensive work.
 
 Non-dry runs through this wrapper are serialized for the current user across
 repositories. A conflicting wrapper run does not wait: it exits `BUSY`. Direct

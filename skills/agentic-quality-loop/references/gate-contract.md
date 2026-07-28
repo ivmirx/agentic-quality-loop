@@ -17,12 +17,22 @@ Expose one repository-owned command accepting:
 
 Required profiles:
 
-- `auto`: select the union of profiles implied by changed paths;
+- `auto`: select the smallest sufficient union of checks implied by all changed
+  paths;
 - `fast`: run the inexpensive deterministic development gate;
-- `full`: run all locally available non-live verification.
+- `full`: run the repository's complete default local non-live verification.
 
-`native` is optional and may require installed platform SDKs. Unknown changed
-paths must widen the selection rather than silently skipping checks.
+`native` is optional. When present, it runs `full` plus the documented
+SDK-dependent native or platform verification. A repository whose normal local
+verification is inherently platform-dependent may omit `native` and include
+those checks in `full`. Unknown changed paths must widen the selection to
+`full`, or to `native` when they may affect its evidence, rather than silently
+skipping checks.
+Profiles are operator-facing choices, not required internal routing buckets.
+An `auto` run may compose checks more narrowly than a named profile; it must
+not inherit unrelated expensive checks merely because one required check also
+belongs to `full` or `native`. An explicit `full` run remains exhaustive for
+the repository's default local tier.
 When every check is already cheap, `auto`, `fast`, and `full` may deliberately
 run the same set. In that case no changed-path router is required.
 `--keep-previous-runs` is optional and, when supported, retains the current run
@@ -79,6 +89,21 @@ require it.
   match the recorded task-base policy. Recalibration is a separate, explicit
   quality-policy task with fresh measurements and review; a task must not make
   itself green by editing both source and exemptions.
+- For `auto`, select expensive checks only when a changed input or affected
+  consumer can invalidate the evidence they prove. Keep routing groups coarse
+  enough to maintain, but do not use one broad native or UI flag to run
+  unrelated behavior checks.
+- When `auto` or `full` is materially slower than `fast`, print elapsed time for
+  each check and the changed path or rule that selected every expensive check.
+  Do not execute the same deterministic check twice in one invocation unless
+  the second execution proves a distinct state and the gate reports that
+  reason.
+- Treat every changed-path consumer as deletion- and rename-aware. A scanner
+  must not assume that each path in a complete diff still exists in the working
+  tree.
+- Do not retry deterministic, policy, compiler, or toolchain failures blindly.
+  Retry only an identified transient operation, use a narrow bounded attempt
+  count, and retain the first failure in diagnostics.
 - Make concurrent invocations safe. Read-only checks with no shared mutable
   state need no repository lock. Otherwise isolate compiler/package caches,
   build servers, output roots, and evidence completely, or fail quickly under
@@ -140,7 +165,9 @@ another language or tool. When reliable method mapping is unavailable, keep a
 changed-declaration complexity ratchet and fresh coverage floor/report as
 separate signals. Global coverage alone is not a quality score; use targeted
 mutation testing for important pure rules when its runtime and signal are
-proven.
+proven. Every mutation pilot must record its runtime, useful findings, and
+dependency cost, then explicitly retain it, make it periodic, or remove it.
+Do not leave rejected pilot tooling installed.
 
 CI is not required by this contract. The same local entrypoint may be wired to
 CI later without changing its semantics.
